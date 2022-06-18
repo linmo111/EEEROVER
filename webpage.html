@@ -1,0 +1,363 @@
+<html lang="en">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>
+  <meta charset="utf-8"/>
+
+  <title>Websocket</title>
+
+</head>
+
+
+<body>
+
+<input style="width: 800px;height: 200px" type="text" placeholder="enter text here to send to server" id="eingabe" onkeypress="myFunction(event)"/>
+<button onclick="clearlog()" >Clear Logs</button>
+<button onclick="LEDon()" >LED on</button>
+<button onclick="LEDoff()" >LED off</button>
+<button onclick="Forward()" >foward</button>
+<button onclick="Backward()" >backward</button>
+<button onclick="Stop()" >stop</button>
+<p style="font-size:20px;" id="Ultrasonic">UltraSonic:</p>
+<p style="font-size:20px;" id="Magnetic">Magnetic:</p>
+<p style="font-size:20px;" id="IR">Infared:</p>
+<p style="font-size:20px;" id="Radio">Radio:</p>
+<p style="font-size:50px;" id="RockType">RockType:</p>
+
+<div style="overflow:scroll; width: 800px; height: 550px; border: solid; border-radius: 9px" id="display"></div>
+
+  <script>
+
+
+  
+  var LeftRightAxis=0;
+  var UpDownAxis=0;
+  
+  //var sock =new WebSocket("ws://localhost:5001");
+  var sock =new WebSocket("ws://192.168.43.196:8080");  //replace this address with the one the node.js server prints out. keep port 3000
+  var display=document.getElementById("display")
+  var count=0;
+  window.addEventListener('gamepadconnected', (event) => {
+  const update = () => {
+  
+    for (const gamepad of navigator.getGamepads()) {
+      if (!gamepad) continue;
+      for (const [index, button] of gamepad.buttons.entries()) {//X to turn on LED, O to turn off
+           if (index==0 && button.pressed){
+            console.log("ONpressed");
+             LEDon();
+           }
+           if (index==1 && button.pressed){
+             LEDoff();
+             console.log("OFFpressed");
+           }
+           
+      }
+      for (const [index, axis] of gamepad.axes.entries()) {//left joystick controlling movement of car
+       
+        if(index==0){
+          
+          LeftRightAxis=axis*0.5+0.5;
+          //console.log(LeftRightAxis);
+
+        }
+        else if(index==1){
+          UpDownAxis=axis*0.5+0.5;
+          //console.log(UpDownAxis);
+
+        }
+
+         /*
+           if(index==0 && axis*0.5+0.5>0.9){
+           // console.log("Right");
+             Right();
+           }
+           else if(index==0 && axis*0.5+0.5<0.1){
+            //console.log("left");
+             Left();
+            }
+           else if(index==1 && axis*0.5+0.5>0.9){
+             Backward();
+            }
+           else if(index==1 && axis*0.5+0.5<0.1){
+             Forward();
+            }
+            else if (index==1 && axis==0){
+              if(index==0 && axis==0){
+            
+              Stop();
+              }
+          }
+          */
+          JoystickMotorControl();
+          }
+          
+
+    }
+    requestAnimationFrame(update);
+    
+  };
+  update();
+});
+
+  sock.onopen=function(event){
+  //alert("Socket connected succesfully!!!")
+  setTimeout(function(){sock.send('connection succeeded');},1000);
+  display.innerHTML+="connection succeeded <br />";
+
+  };
+
+  var IRVal=0;
+  var MagneticVal=0;
+  var RadioVal=0;
+  var UltraSonicVal=0;
+  var LastRockType="Not Found Rocks";
+  sock.onmessage=function(event){
+
+    
+    outurl = URL.createObjectURL(event.data);//somehow event.data becomes the blob datatype, this turns it into string
+fetch(outurl)
+.then(res => res.text())
+.then(data => {
+  
+  const JsonMessage=JSON.parse(data);//makes the string data json format
+  IRVal=JsonMessage.Infared;
+  MagneticVal=JsonMessage.Magnetic;
+  RadioVal=JsonMessage.Radio;
+  UltraSonicVal=JsonMessage.Ultrasonic;//retrieves the data of each sensor value and stores them
+  displayIR(IRVal);
+  displayMagnetic(MagneticVal);
+  displayRadio(RadioVal);
+  displayUltrasonic(UltraSonicVal);//display them onto the webpage
+  var rockType=IdentifyRockType();//found the type of the rock
+  document.getElementById("RockType").innerHTML = "RockType: "+rockType;//displays the current rocktype
+  if(rockType!=LastRockType){
+    LastRockType=rockType;//refresh last rocktype
+    if (rockType!= "Not Found Rocks"){
+    
+      display.innerHTML+="<strong>Last Identified Rocktype: </strong>" + rockType+"<br />";  }//logs the Rocktype if different 
+  }
+ 
+
+    //console.log(data)
+})
+
+  
+ }
+ 
+    
+
+function myFunction(event) {
+    //sock.send("Hello");
+if(event.keyCode==13){	   //when enter is pressed...
+  var text=document.getElementById('eingabe').value;    //assign value of the entered string to te text variable
+  if(text!=""){     //if text is not an empty string
+  //display.innerHTML+="From Client: "+text+"<br />"; //show the message from client in div
+sock.send(text);    //send string to server
+display.innerHTML+="<strong>Me: </strong>" + text+"<br />";       //display input text in div (client side)
+document.getElementById('eingabe').value="";     //and clear the input field
+}
+else{
+console.log("empty string not sent")
+}
+}}
+
+
+var LED=0;
+var MotorState=0;
+
+function MakeMessageSend(){
+  var MessageSend = JSON.stringify({
+  "LED":LED,
+  "MotorState":MotorState});
+  return MessageSend;//makes the json string of message going to be sent
+}
+
+
+function clearlog(){
+  display.innerHTML="";
+}
+
+
+
+
+function LEDon(){
+ // displayIR(1);
+  //sock.send("LED ON");
+  if(LED!=1){
+  LED=1;
+
+  
+  sock.send(MakeMessageSend());//send json if LEDon buttons are pressed
+  }
+  
+}
+function LEDoff(){
+  if(LED!=0){
+
+  
+  LED=0;
+  
+  sock.send(MakeMessageSend());//send json of LEDoff buttons are pressed
+}
+  //sock.send("LED OFF");
+}
+//all below sends the json of according value of state of motors
+function Forward(){
+  if(MotorState!=1){
+  MotorState=1;
+
+  sock.send(MakeMessageSend());}
+ // sock.send("Forward");
+}
+function Backward(){
+  if(MotorState!=2){
+  MotorState=2;
+  sock.send(MakeMessageSend());}
+ // sock.send("Backward");
+}
+function Stop(){
+  if(MotorState!=0){
+  MotorState=0;
+
+  sock.send(MakeMessageSend());}
+ // sock.send("Stop");
+}
+function Left(){
+  if(MotorState!=3){
+  MotorState=3;
+
+  sock.send(MakeMessageSend());}
+ // sock.send("Stop");
+}
+function Right(){
+  if(MotorState!=4){
+  MotorState=4;
+
+  sock.send(MakeMessageSend());}
+ // sock.send("Stop");
+}
+function JoystickMotorControl(){
+ //console.log(LeftRightAxis,UpDownAxis);
+  if(LeftRightAxis >0.9){
+           // console.log("Right");
+             Right();
+           }
+  else if(LeftRightAxis<0.1){
+            //console.log("left");
+             Left();
+            }
+  else if(UpDownAxis>0.9){
+             Backward();
+            }
+  else if(UpDownAxis<0.1){
+             Forward();
+            }
+  else if (0.4<UpDownAxis &&     UpDownAxis<0.6 && 0.4< LeftRightAxis && LeftRightAxis<0.6){
+          //  console.log("stop");
+            
+              Stop();
+              
+            }
+
+}
+
+//all below displays the current sensor reading values
+function displayUltrasonic(message) {
+  document.getElementById("Ultrasonic").innerHTML = "UltraSonic: "+message;
+}
+function displayIR(message) {
+  document.getElementById("IR").innerHTML = "Infared: "+message;
+}
+function displayMagnetic(message) {
+  document.getElementById("Magnetic").innerHTML = "Magnetic: "+message;
+}
+function displayRadio(message) {
+  document.getElementById("Radio").innerHTML = "Radio: "+message;
+}
+
+function RadioInRange(range){
+   //check if Radio frequency lies between the wanted frequency with 5% error allowance
+  if(0.95*range<RadioVal && RadioVal<1.05*range){
+    return true;
+  }
+  else{
+    return false;
+  }
+
+}
+function IsUltrasonic(){
+  //check if ultrasonic exist
+  if(UltraSonicVal>0){
+    
+    return true;
+  }
+  else{
+    return false;
+  }
+
+}
+function InfaredInRange(range){
+  //if IR frequency lies between the wanted frequency with 5% error allowance
+  if(0.95*range<IRVal&& IRVal<1.05*range){
+    return true;
+  }
+  else{
+    return false;
+  }
+
+}
+function MagneticDirection(direction){
+  //return true if current direction of magnetic field is the same as wanted direction
+  if (MagneticVal>0){
+    if (direction==1){
+      return true;
+    }
+    else{
+      return false;
+    }
+    
+  }
+  else if(MagneticVal<0){
+    if (direction==0){
+      return true;
+    }
+    else{
+      return false;
+    }
+  }
+  else{
+    return false;
+  }
+}
+
+function IdentifyRockType(){
+  //identifies the rock type based on sensor readings and the table
+  if(RadioInRange(61000) && IsUltrasonic() ){
+    return "Gaborium";
+  }
+  else if(RadioInRange(61000) && !IsUltrasonic()){
+    return "Lathwaite";
+  }
+  else if(RadioInRange(89000) && MagneticDirection()){
+    return "Adamantine";
+  }
+  else if(RadioInRange(89000) && !MagneticDirection()){
+    return "Xirang";
+  }
+  else if(InfaredInRange(353) && !IsUltrasonic()){
+    return "ThioTimoline";
+  }
+  else if(InfaredInRange(571) && IsUltrasonic()){
+    return" Netherite";
+  }
+  else{
+    return "Not Found Rocks";
+  }
+  
+  
+}
+
+
+  </script>
+</body>
+</html>
