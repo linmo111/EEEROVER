@@ -10,16 +10,21 @@
 
 <body>
 
-<input style="width: 800px;height: 200px" type="text" placeholder="enter text here to send to server" id="eingabe" onkeypress="myFunction(event)"/>
+<!--<input style="width: 800px;height: 200px" type="text" placeholder="enter text here to send to server" id="eingabe" onkeypress="myFunction(event)"/>
+-->
 <button onclick="clearlog()" >Clear Logs</button>
 <button onclick="LEDon()" >LED on</button>
 <button onclick="LEDoff()" >LED off</button>
-<button onclick="Forward()" >foward</button>
-<button onclick="Backward()" >backward</button>
-<button onclick="Stop()" >stop</button>
-<p style="font-size:20px;" id="Ultrasonic">UltraSonic:</p>
+<button onclick="Forward()" style="position:fixed;top: 50px; right: 70px;font-size:xx-large;" >Forward</button>
+<button onclick="Backward()" style="position:fixed;top: 250px; right: 60px;font-size:xx-large;">Backward</button>
+<button onclick="Left()" style="position:fixed;top: 150px; right: 200px;font-size:xx-large;">Left</button>
+<button onclick="Right()" style="position:fixed;top: 150px; right: 000px;font-size:xx-large;" >Right</button>
+<button onclick="Stop()" style="position:fixed;top: 150px; right: 100px;font-size:xx-large;"> Stop </button>
+<p style="font-size:20px;" id="CarrierFreq">Carrier Frequency:</p>
+<!--
 <p style="font-size:20px;" id="Magnetic">Magnetic:</p>
-<p style="font-size:20px;" id="IR">Infared:</p>
+-->
+<p style="font-size:20px;" id="IR">Infrared:</p>
 <p style="font-size:20px;" id="Radio">Radio:</p>
 <p style="font-size:50px;" id="RockType">RockType:</p>
 
@@ -66,28 +71,7 @@
 
         }
 
-         /*
-           if(index==0 && axis*0.5+0.5>0.9){
-           // console.log("Right");
-             Right();
-           }
-           else if(index==0 && axis*0.5+0.5<0.1){
-            //console.log("left");
-             Left();
-            }
-           else if(index==1 && axis*0.5+0.5>0.9){
-             Backward();
-            }
-           else if(index==1 && axis*0.5+0.5<0.1){
-             Forward();
-            }
-            else if (index==1 && axis==0){
-              if(index==0 && axis==0){
-            
-              Stop();
-              }
-          }
-          */
+       
           JoystickMotorControl();
           }
           
@@ -107,10 +91,11 @@
   };
 
   var IRVal=0;
-  var MagneticVal=0;
+  //var MagneticVal=0;
   var RadioVal=0;
-  var UltraSonicVal=0;
+  var CarrierFreqVal=0;
   var LastRockType="Not Found Rocks";
+  var SameCount=0;
   sock.onmessage=function(event){
 
     
@@ -120,46 +105,39 @@ fetch(outurl)
 .then(data => {
   
   const JsonMessage=JSON.parse(data);//makes the string data json format
-  IRVal=JsonMessage.Infared;
-  MagneticVal=JsonMessage.Magnetic;
+  IRVal=JsonMessage.Infrared;
+  //MagneticVal=JsonMessage.Magnetic;
   RadioVal=JsonMessage.Radio;
-  UltraSonicVal=JsonMessage.Ultrasonic;//retrieves the data of each sensor value and stores them
+  CarrierFreqVal=JsonMessage.CarrierFreq;//retrieves the data of each sensor value and stores them
   displayIR(IRVal);
-  displayMagnetic(MagneticVal);
+  //displayMagnetic(MagneticVal);
   displayRadio(RadioVal);
-  displayUltrasonic(UltraSonicVal);//display them onto the webpage
+  displayCarrierFreq(CarrierFreqVal);//display them onto the webpage
   var rockType=IdentifyRockType();//found the type of the rock
-  document.getElementById("RockType").innerHTML = "RockType: "+rockType;//displays the current rocktype
-  if(rockType!=LastRockType){
-    LastRockType=rockType;//refresh last rocktype
-    if (rockType!= "Not Found Rocks"){
+  if(rockType==LastRockType){//display the rock only if 3 continous readings, so there is no anomaly
+    SameCount+=1;
+    if(SameCount==3){
+      if (rockType!= "Not Found Rocks"){
+      display.innerHTML+="<strong>Last Identified Rocktype: </strong>" + rockType+"<br />"; 
+      }
+
+    }
+  }
+  else{
+    LastRockType=rockType;
+    SameCount=0;
     
-      display.innerHTML+="<strong>Last Identified Rocktype: </strong>" + rockType+"<br />";  }//logs the Rocktype if different 
+
   }
  
+  document.getElementById("RockType").innerHTML = "RockType: "+rockType;//displays the current rocktype
 
-    //console.log(data)
 })
 
   
  }
  
     
-
-function myFunction(event) {
-    //sock.send("Hello");
-if(event.keyCode==13){	   //when enter is pressed...
-  var text=document.getElementById('eingabe').value;    //assign value of the entered string to te text variable
-  if(text!=""){     //if text is not an empty string
-  //display.innerHTML+="From Client: "+text+"<br />"; //show the message from client in div
-sock.send(text);    //send string to server
-display.innerHTML+="<strong>Me: </strong>" + text+"<br />";       //display input text in div (client side)
-document.getElementById('eingabe').value="";     //and clear the input field
-}
-else{
-console.log("empty string not sent")
-}
-}}
 
 
 var LED=0;
@@ -262,11 +240,11 @@ function JoystickMotorControl(){
 }
 
 //all below displays the current sensor reading values
-function displayUltrasonic(message) {
-  document.getElementById("Ultrasonic").innerHTML = "UltraSonic: "+message;
+function displayCarrierFreq(message) {
+  document.getElementById("CarrierFreq").innerHTML = "Carrier Frequency: "+message;
 }
 function displayIR(message) {
-  document.getElementById("IR").innerHTML = "Infared: "+message;
+  document.getElementById("IR").innerHTML = "Infrared: "+message;
 }
 function displayMagnetic(message) {
   document.getElementById("Magnetic").innerHTML = "Magnetic: "+message;
@@ -285,9 +263,9 @@ function RadioInRange(range){
   }
 
 }
-function IsUltrasonic(){
-  //check if ultrasonic exist
-  if(UltraSonicVal>0){
+function IsCarrierFreq(){
+  //check if carrier frequency is 61k
+  if(CarrierVal>800){
     
     return true;
   }
@@ -296,7 +274,7 @@ function IsUltrasonic(){
   }
 
 }
-function InfaredInRange(range){
+function InfraredInRange(range){
   //if IR frequency lies between the wanted frequency with 5% error allowance
   if(0.95*range<IRVal&& IRVal<1.05*range){
     return true;
@@ -306,24 +284,11 @@ function InfaredInRange(range){
   }
 
 }
-function MagneticDirection(direction){
+function IsMagnetic(){
   //return true if current direction of magnetic field is the same as wanted direction
-  if (MagneticVal>0){
-    if (direction==1){
-      return true;
-    }
-    else{
-      return false;
-    }
+  if (MagneticVal>50){
+    return true;
     
-  }
-  else if(MagneticVal<0){
-    if (direction==0){
-      return true;
-    }
-    else{
-      return false;
-    }
   }
   else{
     return false;
@@ -332,22 +297,22 @@ function MagneticDirection(direction){
 
 function IdentifyRockType(){
   //identifies the rock type based on sensor readings and the table
-  if(RadioInRange(61000) && IsUltrasonic() ){
+  if(RadioInRange(151) && IsCarrierFreq()){
     return "Gaborium";
   }
-  else if(RadioInRange(61000) && !IsUltrasonic()){
+  else if(RadioInRange(639) && IsCarrierFreq()){
     return "Lathwaite";
   }
-  else if(RadioInRange(89000) && MagneticDirection()){
+  else if(RadioInRange(151) && !IsCarrierFreq()){
     return "Adamantine";
   }
-  else if(RadioInRange(89000) && !MagneticDirection()){
+  else if(RadioInRange(239) && !IsCarrierFreq()){
     return "Xirang";
   }
-  else if(InfaredInRange(353) && !IsUltrasonic()){
+  else if(InfraredInRange(353) ){
     return "ThioTimoline";
   }
-  else if(InfaredInRange(571) && IsUltrasonic()){
+  else if(InfraredInRange(571) ){
     return" Netherite";
   }
   else{
