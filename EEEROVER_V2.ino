@@ -22,17 +22,17 @@ WiFiWebSocketClient  wsClient(client, serverAddress, port);
 int count = 0;
 //StaticJsonBuffer<300> JSONBuffer;
 
-const byte USPin=1;
+const byte CFPin=A1;
 const byte IRPin=2;
-const byte RFPin=3;
-const byte MGPin=4;
+const byte RFPin=13;
+//const byte MGPin=A0;
 
 
 
 SAMDTimer RadioTimer(TIMER_TC3);
 SAMDTimer IRTimer(TIMER_TC4);
-SAMDTimer MagneticTimer(TIMER_TC5);
-SAMDTimer UltrasonicTimer(TIMER_TCC);
+//SAMDTimer MagneticTimer(TIMER_TC5);
+SAMDTimer CarrierFreqTimer(TIMER_TCC);
 //SAMDTimer WSTimer(TIMER_TCC1);
 SAMDTimer WSsendTimer(TIMER_TCC2);
 
@@ -42,21 +42,21 @@ int IR_timeCount=0;
 bool RF_active=false;
 int RF_count=0;
 int RF_timeCount=0;
-int MG_count=0;
-int MG_total=0;
-int US_count=0;
-int US_total=0;
-int US_TrueCount=0;
+//int MG_count=0;
+//int MG_total=0;
+int CF_count=0;
+int CF_total=0;
+int CF_TrueCount=0;
 
 volatile int LED=0;
 volatile int MotorState=0;
-volatile double Ultrasonic=0;
-volatile double Infared=0;
-volatile double Magnetic=0;
+volatile double CarrierFreq=0;
+volatile double Infrared=0;
+//volatile double Magnetic=0;
 volatile double Radio=0;
-volatile bool UltrasonicChanged=0;
-volatile bool InfaredChanged=0;
-volatile bool MagneticChanged=0;
+volatile bool CarrierFreqChanged=0;
+volatile bool InfraredChanged=0;
+//volatile bool MagneticChanged=0;
 volatile bool RadioChanged=0;
 
 const int MotorLIN1= 9;
@@ -161,10 +161,10 @@ JsonObject CreateJson(){
   DynamicJsonDocument jBuffer(1024);
 //  DynamicJsonBuffer jBuffer;
   JsonObject root=jBuffer.createNestedObject();
-  root["Infared"]=Infared;
+  root["Infrared"]=Infrared;
   root["Radio"]=Radio;
-  root["Magnetic"]=Magnetic;
-  root["Ultrasonic"]=Ultrasonic;
+  //root["Magnetic"]=Magnetic;
+  root["CarrierFreq"]=CarrierFreq;
   return root;
 }
 
@@ -180,7 +180,7 @@ void RadioTimerHandler()
   RF_timeCount++;
   if(RF_timeCount==500){
     RF_timeCount=0;
-    Radio=RF_count*2;
+    Radio=RF_count*2-4;
     RF_count=0;
     RadioChanged=1;
   }
@@ -198,20 +198,21 @@ void IRTimerHandler(){
   IR_timeCount++;
   if(IR_timeCount==500){
     IR_timeCount=0;
-    Infared=IR_count*2;
+    Infrared=IR_count*2-4;
     IR_count=0;
-    InfaredChanged=1;
+    InfraredChanged=1;
   }
   
-  //Infared+=1;
-  //InfaredChanged=1;
+  //Infrared+=1;
+  //InfraredChanged=1;
 }
-
+/*
 void MagneticTimerHandler(){
   MG_count++;
   MG_total+=analogRead(MGPin);
   if (MG_count==500){
     Magnetic=MG_total/500;
+    MG_total=0;
     MagneticChanged=1;
     MG_count=0;
     
@@ -222,22 +223,23 @@ void MagneticTimerHandler(){
  // Magnetic+=1;
   //MagneticChanged=1;
   
-}
-void UltrasonicTimerHandler(){
-  US_count++;
-  if(analogRead(USPin)>0.1){
-    US_total+=analogRead(USPin);
-    US_TrueCount++;
+}*/
+void CarrierFreqTimerHandler(){
+  CF_count++;
+  if(analogRead(CFPin)>0.1){
+    CF_total+=analogRead(CFPin);
+    CF_TrueCount++;
   }
   
-  if (US_count==500){
-    if(US_TrueCount==0){
-      US_TrueCount=1;
+  if (CF_count==500){
+    if(CF_TrueCount==0){
+      CF_TrueCount=1;
     }
-    Ultrasonic=US_total/US_TrueCount;
-    US_TrueCount=0;
-    UltrasonicChanged=1;
-    US_count=0;
+    CarrierFreq=CF_total/CF_TrueCount;
+    CF_TrueCount=0;
+    CF_total=0;
+    CarrierFreqChanged=1;
+    CF_count=0;
     
   }
   //Ultrasonic+=1;
@@ -274,7 +276,7 @@ void WSTimerHandler(){
   
 }
 void WSsendTimerHandler(){
-  if(RadioChanged && MagneticChanged && InfaredChanged && UltrasonicChanged){
+  if(RadioChanged && InfraredChanged && CarrierFreqChanged){
     //Serial.println("sending a message");
     
     JsonObject JsonMessage=CreateJson();
@@ -288,9 +290,9 @@ void WSsendTimerHandler(){
     
     wsClient.endMessage();
     RadioChanged=0;
-    MagneticChanged=0;
-    UltrasonicChanged=0;
-    InfaredChanged=0;
+    //MagneticChanged=0;
+    CarrierFreqChanged=0;
+    InfraredChanged=0;
    // Serial.println("sent a message"+output);
     }
   
@@ -308,8 +310,8 @@ void setup() {
   Serial.begin(115200);
   pinMode(IRPin, INPUT_PULLUP);
   pinMode(RFPin, INPUT_PULLUP);
-  pinMode(MGPin, INPUT);
-  pinMode(USPin, INPUT);
+ // pinMode(MGPin, INPUT);
+  pinMode(CFPin, INPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(MotorRIN1, OUTPUT);
   pinMode(MotorRIN2, OUTPUT);
@@ -341,8 +343,8 @@ void setup() {
   wsClient.begin();
   RadioTimer.attachInterruptInterval_MS(1,RadioTimerHandler);
   IRTimer.attachInterruptInterval_MS(1,IRTimerHandler);
-  MagneticTimer.attachInterruptInterval_MS(1,MagneticTimerHandler);
-  UltrasonicTimer.attachInterruptInterval_MS(1,UltrasonicTimerHandler);
+  //MagneticTimer.attachInterruptInterval_MS(1,MagneticTimerHandler);
+  CarrierFreqTimer.attachInterruptInterval_MS(1,CarrierFreqTimerHandler);
  // WSTimer.attachInterruptInterval_MS(50,WSTimerHandler);
   WSsendTimer.attachInterruptInterval_MS(500,WSsendTimerHandler);
   attachInterrupt(digitalPinToInterrupt(IRPin), IRfound, FALLING);
@@ -380,7 +382,7 @@ void loop() {
   }
   /*
    while (wsClient.connected()) {
-    if(RadioChanged && MagneticChanged && InfaredChanged && UltrasonicChanged){
+    if(RadioChanged && MagneticChanged && InfraredChanged && UltrasonicChanged){
     //Serial.println("sending a message");
     
     JsonObject JsonMessage=CreateJson();
@@ -396,7 +398,7 @@ void loop() {
     RadioChanged=0;
     MagneticChanged=0;
     UltrasonicChanged=0;
-    InfaredChanged=0;
+    InfraredChanged=0;
    // Serial.println("sent a message"+output);
     }
    }
