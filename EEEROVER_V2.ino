@@ -22,7 +22,7 @@ WiFiWebSocketClient  wsClient(client, serverAddress, port);
 int count = 0;
 //StaticJsonBuffer<300> JSONBuffer;
 
-const byte CFPin=A1;
+const byte CFPin=1;
 const byte IRPin=2;
 const byte RFPin=13;
 //const byte MGPin=A0;
@@ -178,9 +178,9 @@ void RadioTimerHandler()
     RF_active=false;
   }
   RF_timeCount++;
-  if(RF_timeCount==500){
+  if(RF_timeCount==1000){
     RF_timeCount=0;
-    Radio=RF_count*2-4;
+    Radio=RF_count-4;
     RF_count=0;
     RadioChanged=1;
   }
@@ -196,9 +196,9 @@ void IRTimerHandler(){
     IR_active=false;
   }
   IR_timeCount++;
-  if(IR_timeCount==500){
+  if(IR_timeCount==1000){
     IR_timeCount=0;
-    Infrared=IR_count*2-4;
+    Infrared=IR_count-4;
     IR_count=0;
     InfraredChanged=1;
   }
@@ -224,19 +224,21 @@ void MagneticTimerHandler(){
   //MagneticChanged=1;
   
 }*/
+/*
 void CarrierFreqTimerHandler(){
   CF_count++;
-  if(analogRead(CFPin)>0.1){
-    CF_total+=analogRead(CFPin);
-    CF_TrueCount++;
-  }
+  
+  CF_total+=analogRead(CFPin);
+  //CF_TrueCount++;
+  
   
   if (CF_count==500){
-    if(CF_TrueCount==0){
-      CF_TrueCount=1;
-    }
-    CarrierFreq=CF_total/CF_TrueCount;
-    CF_TrueCount=0;
+   // if(CF_TrueCount==0){
+   //    CF_TrueCount=1;
+ //    }
+//  CarrierFreq=CF_total/CF_TrueCount;
+ CarrierFreq=CF_total/CF_count;
+  //  CF_TrueCount=0;
     CF_total=0;
     CarrierFreqChanged=1;
     CF_count=0;
@@ -245,7 +247,27 @@ void CarrierFreqTimerHandler(){
   //Ultrasonic+=1;
   //UltrasonicChanged=1;
 }
+*/
+bool CF_active=false;
+int CF_timeCount=0;
 
+void CFFound(){
+  CF_active=true;
+}
+void CarrierFreqTimerHandler(){
+  if(CF_active){
+    CF_count++;
+    CF_active=false;
+  }
+  CF_timeCount++;
+  if(CF_timeCount==1000){
+    CF_timeCount=0;
+   CarrierFreq=CF_count-4;
+    CF_count=0;
+    CarrierFreqChanged=1;
+  }
+  
+}
 void WSTimerHandler(){
   if(wsClient.connected()){
     //Serial.println("recieving");
@@ -311,7 +333,7 @@ void setup() {
   pinMode(IRPin, INPUT_PULLUP);
   pinMode(RFPin, INPUT_PULLUP);
  // pinMode(MGPin, INPUT);
-  pinMode(CFPin, INPUT);
+  pinMode(CFPin, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(MotorRIN1, OUTPUT);
   pinMode(MotorRIN2, OUTPUT);
@@ -346,9 +368,10 @@ void setup() {
   //MagneticTimer.attachInterruptInterval_MS(1,MagneticTimerHandler);
   CarrierFreqTimer.attachInterruptInterval_MS(1,CarrierFreqTimerHandler);
  // WSTimer.attachInterruptInterval_MS(50,WSTimerHandler);
-  WSsendTimer.attachInterruptInterval_MS(500,WSsendTimerHandler);
+  WSsendTimer.attachInterruptInterval_MS(1000,WSsendTimerHandler);
   attachInterrupt(digitalPinToInterrupt(IRPin), IRfound, FALLING);
   attachInterrupt(digitalPinToInterrupt(RFPin), RFfound, FALLING);
+  attachInterrupt(digitalPinToInterrupt(CFPin), CFFound, FALLING);
   
 
 }
@@ -379,37 +402,10 @@ void loop() {
       MotorControl();
     
   }
+  wsClient.flush();
   }
-  /*
-   while (wsClient.connected()) {
-    if(RadioChanged && MagneticChanged && InfraredChanged && UltrasonicChanged){
-    //Serial.println("sending a message");
-    
-    JsonObject JsonMessage=CreateJson();
-    String output;
-    serializeJson(JsonMessage, output);
-    wsClient.beginMessage(TYPE_TEXT);
-  
- 
-    wsClient.print(output);
-   // wsClient.print("1");
-    
-    wsClient.endMessage();
-    RadioChanged=0;
-    MagneticChanged=0;
-    UltrasonicChanged=0;
-    InfraredChanged=0;
-   // Serial.println("sent a message"+output);
-    }
-   }
-    
-    
-   // delay(100);
+  else{
+   // wsClient.begin();
+  }
 
-    
-  
-  wsClient.begin();
-  
-  // put your main code here, to run repeatedly:
-*/
 }
