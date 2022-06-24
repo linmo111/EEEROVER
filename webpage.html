@@ -15,11 +15,11 @@
 <button onclick="clearlog()" >Clear Logs</button>
 <button onclick="LEDon()" >LED on</button>
 <button onclick="LEDoff()" >LED off</button>
-<button onclick="Forward()" style="position:fixed;top: 50px; right: 70px;font-size:xx-large;" >Forward</button>
-<button onclick="Backward()" style="position:fixed;top: 250px; right: 60px;font-size:xx-large;">Backward</button>
-<button onclick="Left()" style="position:fixed;top: 150px; right: 200px;font-size:xx-large;">Left</button>
-<button onclick="Right()" style="position:fixed;top: 150px; right: 000px;font-size:xx-large;" >Right</button>
-<button onclick="Stop()" style="position:fixed;top: 150px; right: 100px;font-size:xx-large;"> Stop </button>
+<button onclick="Forward()" style="position:absolute;top: 50px; right: 70px;font-size:xx-large;" >Forward</button>
+<button onclick="Backward()" style="position:absolute;top: 250px; right: 60px;font-size:xx-large;">Backward</button>
+<button onclick="Left()" style="position:absolute;top: 150px; right: 200px;font-size:xx-large;">Left</button>
+<button onclick="Right()" style="position:absolute;top: 150px; right: 000px;font-size:xx-large;" >Right</button>
+<button onclick="Stop()" style="position:absolute;top: 150px; right: 100px;font-size:xx-large;"> Stop </button>
 <p style="font-size:20px;" id="CarrierFreq">Carrier Frequency:</p>
 <!--
 <p style="font-size:20px;" id="Magnetic">Magnetic:</p>
@@ -28,7 +28,18 @@
 <p style="font-size:20px;" id="Radio">Radio:</p>
 <p style="font-size:50px;" id="RockType">RockType:</p>
 
-<div style="overflow:scroll; width: 800px; height: 550px; border: solid; border-radius: 9px" id="display"></div>
+<div style="overflow:scroll; width: 400px; height: 550px; border: solid; border-radius: 9px" id="display"></div>
+<button onclick="record('Gaborium')" style="position:absolute;top: 20px; left: 500px;font-size:xx-large;" > Gaborium, CF200+,151Hz </button>
+<button onclick="record('Lathwaite')" style="position:absolute;top: 60px; left: 500px;font-size:xx-large;" > Lathwaite, CF200+, 239HZ </button>
+<button onclick="record('Adamantine')" style="position:absolute;top: 100px; left: 500px;font-size:xx-large;" > Adamantine, CF200-, 151+HZ </button>
+<button onclick="record('Xirang')" style="position:absolute;top: 140px; left: 500px;font-size:xx-large;" > Xirang, CF200-, 239+HZ </button>
+<button onclick="record('ThioTimoline')" style="position:absolute;top: 180px; left: 500px;font-size:xx-large;" > ThioTimoline, IR353HZ  </button>
+<button onclick="record('Netherite')" style="position:absolute;top: 220px; left: 500px;font-size:xx-large;" >Netherite, IR571HZ </button>
+
+
+<div style="overflow:scroll; width: 400px; height: 550px; border: solid; border-radius: 9px; position:absolute; top: 300px;left: 450px;" id="RocksDisplay"></div>
+
+
 
   <script>
 
@@ -93,9 +104,10 @@
   var IRVal=0;
   //var MagneticVal=0;
   var RadioVal=0;
-  var CarrierFreqVal=0;
+  var CarrierVal=0;
   var LastRockType="Not Found Rocks";
   var SameCount=0;
+  var LastfoundRock= "Not Found Rocks";
   sock.onmessage=function(event){
 
     
@@ -108,16 +120,18 @@ fetch(outurl)
   IRVal=JsonMessage.Infrared;
   //MagneticVal=JsonMessage.Magnetic;
   RadioVal=JsonMessage.Radio;
-  CarrierFreqVal=JsonMessage.CarrierFreq;//retrieves the data of each sensor value and stores them
+  CarrierVal=JsonMessage.CarrierFreq;//retrieves the data of each sensor value and stores them
   displayIR(IRVal);
   //displayMagnetic(MagneticVal);
   displayRadio(RadioVal);
-  displayCarrierFreq(CarrierFreqVal);//display them onto the webpage
+  displayCarrierFreq(CarrierVal);//display them onto the webpage
   var rockType=IdentifyRockType();//found the type of the rock
+  
   if(rockType==LastRockType){//display the rock only if 3 continous readings, so there is no anomaly
     SameCount+=1;
-    if(SameCount==3){
+    if(SameCount==2){
       if (rockType!= "Not Found Rocks"){
+        LastfoundRock=rockType;
       display.innerHTML+="<strong>Last Identified Rocktype: </strong>" + rockType+"<br />"; 
       }
 
@@ -153,9 +167,12 @@ function MakeMessageSend(){
 
 function clearlog(){
   display.innerHTML="";
+  document.getElementById("RocksDisplay").innerHTML="";
 }
 
-
+function record(text){
+  document.getElementById("RocksDisplay").innerHTML+=text+"<br />";
+}
 
 
 function LEDon(){
@@ -255,7 +272,7 @@ function displayRadio(message) {
 
 function RadioInRange(range){
    //check if Radio frequency lies between the wanted frequency with 5% error allowance
-  if(0.95*range<RadioVal && RadioVal<1.05*range){
+  if(range*0.90<RadioVal && RadioVal<1.10*range){
     return true;
   }
   else{
@@ -263,20 +280,23 @@ function RadioInRange(range){
   }
 
 }
-function IsCarrierFreq(){
+function IsCarrierFreq(high, low){
   //check if carrier frequency is 61k
-  if(CarrierVal>800){
+  if(CarrierVal>high){
     
-    return true;
+    return 1;
+  }
+  else if(CarrierVal<high && CarrierVal>low){
+    return -1;
   }
   else{
-    return false;
+    return 0;
   }
 
 }
 function InfraredInRange(range){
   //if IR frequency lies between the wanted frequency with 5% error allowance
-  if(0.95*range<IRVal&& IRVal<1.05*range){
+  if(0.90*range<IRVal&& IRVal<1.10*range){
     return true;
   }
   else{
@@ -286,7 +306,7 @@ function InfraredInRange(range){
 }
 function IsMagnetic(){
   //return true if current direction of magnetic field is the same as wanted direction
-  if (MagneticVal>50){
+  if (MagneticVal>100){
     return true;
     
   }
@@ -296,28 +316,53 @@ function IsMagnetic(){
 }
 
 function IdentifyRockType(){
+  //console.log(IsCarrierFreq());
+  var carrierfreqLow=IsCarrierFreq(300,230);
+  var carrierfreqHigh=IsCarrierFreq(330,290);
   //identifies the rock type based on sensor readings and the table
-  if(RadioInRange(151) && IsCarrierFreq()){
+  //it is not the same as the values on the table because we found there are noise added onto the readings
+  /*
+  if(RadioInRange(151) && carrierfreqLow==1  ){
     return "Gaborium";
   }
-  else if(RadioInRange(639) && IsCarrierFreq()){
+  if(RadioInRange(242) && carrierfreqHigh==1 ){
     return "Lathwaite";
   }
-  else if(RadioInRange(151) && !IsCarrierFreq()){
+  if(RadioInRange(190) && carrierfreqLow==0 ){
     return "Adamantine";
   }
-  else if(RadioInRange(239) && !IsCarrierFreq()){
+  if(RadioInRange(250) && carrierfreqHigh==0){
     return "Xirang";
   }
-  else if(InfraredInRange(353) ){
+  if(InfraredInRange(353) ){
     return "ThioTimoline";
   }
-  else if(InfraredInRange(571) ){
+  if(InfraredInRange(571) ){
     return" Netherite";
   }
-  else{
-    return "Not Found Rocks";
+  */
+
+  if(RadioInRange(151)  ){
+    return "Gaborium";
   }
+  if(RadioInRange(242) ){
+    return "Lathwaite";
+  }
+  if(RadioInRange(185)  ){
+    return "Adamantine";
+  }
+  if(RadioInRange(270)){
+    return "Xirang";
+  }
+  if(InfraredInRange(353) ){
+    return "ThioTimoline";
+  }
+  if(InfraredInRange(571) ){
+    return" Netherite";
+  }
+  
+    return "Not Found Rocks";
+  
   
   
 }
